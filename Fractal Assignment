@@ -1,0 +1,141 @@
+import pandas as pd
+import numpy as np
+import os
+import string
+import nltk
+import re
+from sklearn.feature_extraction.text import CountVectorizer
+from collections import Counter
+
+
+def readMessagesFromFile(fPath,*args):
+    f=open(fPath,'r')
+    lines = f.readlines()
+    data=[]
+    col=[]
+    for line in lines:
+        elements = line.strip().split("\t")
+        data.append(elements)
+    data1=pd.DataFrame(data)
+    data1.fillna(value=np.nan, inplace=True)
+    for arg in args:
+        col.append(arg)
+    data1.columns=col
+    return data1 
+    
+def findFilesInDir(dirPath, pattern):
+    list1 = os.listdir(dirPath)
+    pt=pattern
+    lt=[]
+    for l in list1:
+        if pt in l:
+            lt.append(l)
+    return lt  
+    
+def readMessagesFromDir(dirPath, fileNamePattern, *args):
+    lt1=findFilesInDir(dirPath, fileNamePattern)
+    df = pd.DataFrame()
+    col2=[]
+    for arg in args:
+        col2.append(arg)
+    for l in lt1:
+        t=dirPath+'/'+l
+        td=readMessagesFromFile(t,col2)
+        td['FilePath']=t 
+        df=df.append(td)
+    return df
+    
+#Collection of all the Dataset
+all=readMessagesFromDir('C:/Users/Tirthankar/Desktop/fractal/trial-run-recruitment-task/trial-run-recruitment-task/data','labelled','message','sentiment')
+
+def makeLabel(fromFilePath):
+    chk=fromFilePath
+    t=chk.split("/")
+    t2=t[len(t)-1]
+    t3 = t2[:-13]
+    return t3
+    
+def concatDataFrames(msgDFDict, labelFunc):
+    msg3=msgDFDict
+    msg3['label']=msg3.FilePath.apply(labelFunc)
+    return msg3
+    
+#Considered only those documents which are populated with sentiment
+all2 = all.dropna()
+all1=all2.reset_index(drop=True)
+all_v1=concatDataFrames(all1,makeLabel)
+all_v2=all_v1[['sentiment','label']]
+all_v3=all_v2.reset_index(drop=True)
+all_v4=all_v3.reset_index()
+
+#Solution 1: With the help of NLTK inbuilt function
+
+def makeTermsFrom(msg):
+    vec = CountVectorizer(strip_accents=None, encoding=string)
+    X = vec.fit_transform(msg)
+    df4 = pd.DataFrame(X.toarray(), columns=vec.get_feature_names())
+    return df4
+
+def countVocabulary(msgsDF):
+    tf1=makeTermsFrom(msgsDF)
+    tf2=tf1.reset_index(drop=True)
+    tf3=tf2.reset_index()
+    merged_df = tf3.merge(all_v4, how='left', on='index')
+    merged_df1=merged_df.drop('index', axis=1)
+    rs=pd.melt(merged_df1, id_vars=['sentiment_y','label'], var_name='term', value_name='values')
+    rs1=rs.groupby(['sentiment_y','label','term'],as_index=False)[['values']].sum()
+    rs2=rs1[rs1['values']>0]
+    return rs2
+    
+counts=countVocabulary(all1['message'])
+counts.to_csv('C:/Users/Tirthankar/Desktop/fractal/trial-run-recruitment-task/trial-run-recruitment-task/data/output_data_sol1.csv')
+
+#....................................................................................................................................
+
+#Solution 2: With the help of self-developed function
+def makeTermsFrom_v2(msg):
+    yt=msg
+    all_words = []
+    for line in yt:
+        words = line.split()
+        all_words += words
+    dictionary = Counter(all_words)
+    return dictionary 
+
+
+def countVocabulary_v2(msgsDF):
+    xyz=makeTermsFrom_v2(msgsDF)
+    final_df = pd.DataFrame.from_dict(xyz, orient='index')
+    features_matrix = np.zeros((len(all1),len(final_df)))
+    docID = 0
+    for line in msgsDF:
+        words = line.split()
+        for word in words:
+            wordID = 0
+            for i,d in enumerate(xyz):
+                if d[0] == word:
+                    wordID = i
+                    features_matrix[docID,wordID] = words.count(word)
+        docID = docID + 1
+    dt_txt=pd.DataFrame(features_matrix)
+    ty5=dt_txt.reset_index()
+    ty6 = ty5.merge(all_v4, how='left', on='index')
+    ty7=ty6.drop('index', axis=1)
+    ty8=pd.melt(ty7, id_vars=['sentiment','label'], var_name='term', value_name='values')
+    ty8_v1=ty8[ty8['values']>0]
+    ty9=ty8.groupby(['sentiment','label','term'],as_index=False)[['values']].sum()
+    
+    final_df1=final_df.reset_index(drop=False)
+    chk=final_df1.reset_index()
+    chk.rename(columns={'index': 'term_name','level_0': 'term'}, inplace=True)
+    chk2=chk[chk.columns[0:2]]
+    ty10 = ty9.merge(chk2, how='left', on='term')
+    ty11=ty10.drop('term',axis=1)
+    ty12=ty11[ty11['values']>0]
+    return ty12
+    
+ty=countVocabulary_v2(all1['message'])
+ty.to_csv('C:/Users/Tirthankar/Desktop/fractal/trial-run-recruitment-task/trial-run-recruitment-task/data/output_data_sol2.csv')
+    
+    
+    
