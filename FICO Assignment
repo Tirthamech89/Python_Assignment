@@ -1,0 +1,544 @@
+
+# coding: utf-8
+
+# # Python Assignment
+# --------------------------------------
+# 
+# ### Instructions:
+# - Feel free to add new cells wherever required
+# - Datasets are shared separately in a zipped folder, extract the folder and save the datasets in your working directory
+# 
+# ------------------------------------------------------------
+
+# ### Import relevant libraries
+
+# In[151]:
+
+
+#Libraries
+import pandas as pd
+from sklearn import preprocessing
+from sklearn.preprocessing import MultiLabelBinarizer
+import numpy as np
+from keras.datasets import reuters
+from keras.utils.np_utils import to_categorical
+from keras.preprocessing.text import Tokenizer
+from keras import models
+from keras import layers
+from keras.models import Sequential
+from sklearn.cross_validation import train_test_split
+from keras.layers import Dense
+from keras.wrappers.scikit_learn import KerasClassifier
+from keras.utils import np_utils
+from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import KFold
+from sklearn.preprocessing import LabelEncoder
+from sklearn.pipeline import Pipeline
+from sklearn.metrics import accuracy_score
+
+
+# ### Read the Retail and Customer Information datasets
+# * Retail Dataset: 'Online Retail'
+# * Customer Information Dataset: 'OnlineRetail_Cust'
+# 
+# Note: Datasets are shared separately in a zip file
+
+# In[2]:
+
+
+#Reading data
+OnlineRetail_Cust=pd.read_excel('AssignmentDatabase.xlsx',sheetname='InternalcustomerDs')
+online_retail=pd.read_excel('AssignmentDatabase.xlsx',sheetname='InternalTransactionsDs')
+online_retail
+
+
+# ### Exploratory Data Analysis/ Basic Sense Checks
+
+# Perform a basic sense check/ Exploratory data analysis on the Retail and customer data. Identify the total records, columns, missing values in every columns. Also check the datatypes of different columns
+# <br>For numerical columns, also identify the average, minimum, maximum, standard deviation, and quartile values.
+# Print top/bottom 5 rows of both datasets <br>
+# <br>**Note:** Feel free to Add/Remove cells as per your convenience
+
+# #### Retail Data EDA
+
+# In[128]:
+
+
+#Write Code Here
+len(online_retail.columns)
+list(online_retail.columns)
+online_retail.isnull().sum()
+online_retail.describe()
+online_retail.head(5)
+online_retail.tail(5)
+
+
+# #### Customer Data EDA
+
+# In[129]:
+
+
+#Write Code Here
+len(OnlineRetail_Cust.columns)
+list(OnlineRetail_Cust.columns)
+OnlineRetail_Cust.isnull().sum()
+OnlineRetail_Cust.describe()
+OnlineRetail_Cust.head(5)
+OnlineRetail_Cust.tail(5)
+
+
+# ## Business Problems
+
+# - What are the different discount percentage applicable on transactions. Find the maximum and minimum discount applicable on transactions
+# - In the transactional data, identify the billed amount on each transaction without availing discount, amount paid after including discount, and the total savings made on each transactions
+
+# In[131]:
+
+
+#Write Code Here
+print(online_retail['Discount_Pct'].max())
+online_retail['Discount_Pct'].min()
+
+
+# In[132]:
+
+
+#Write Code Here
+online_retail['billamt_nodiscount']=online_retail.UnitPrice*online_retail.Quantity
+online_retail['billamt_afterdiscount']=online_retail.UnitPrice*(1-online_retail.Discount_Pct)*online_retail.Quantity
+online_retail['tot_savings']=online_retail['billamt_nodiscount'] -  online_retail['billamt_afterdiscount']
+print(online_retail[1148:1150])
+
+
+# - Find the total number of distinct customers in the transactional data
+# - Identify the total amount spend by every customer on transactions, and create a dataframe to store this information
+# - Find the top 5 customers who spent the most amount on purchases
+# - Find the top 5 percentile of customers based on the amount spend by them on purchases
+
+# In[133]:
+
+
+#Write Code Here
+online_retail['CustomerID'].nunique()
+
+
+# In[134]:
+
+
+#Write Code Here
+tot_amt_spend=online_retail.groupby(['CustomerID'],as_index=False).agg({'billamt_afterdiscount': "sum"}).sort_values("billamt_afterdiscount", ascending=False)
+tot_amt_spend
+
+
+# In[135]:
+
+
+#Write Code Here
+tot_amt_spend_top5=online_retail.groupby(['CustomerID'],as_index=False).agg({'billamt_afterdiscount': "sum"}).sort_values("billamt_afterdiscount", ascending=False).head(5)
+tot_amt_spend_top5
+
+
+# In[136]:
+
+
+#Write Code Here
+tot_amt_spend.billamt_afterdiscount.quantile(0.95)
+tot_amt_spend_top5_percent = tot_amt_spend[(tot_amt_spend.billamt_afterdiscount >= tot_amt_spend.billamt_afterdiscount.quantile(0.95))]
+tot_amt_spend_top5_percent
+#tot_amt_spend.billamt_afterdiscount.quantile(0.05)
+
+
+# ##### Create a central dataframe to include customer attributes along with the transactional information
+
+# In[137]:
+
+
+##### Write Code Here
+cust_trans=pd.merge(OnlineRetail_Cust,online_retail,on="CustomerID",how ="left")
+cust_trans.head()
+
+# Add new columns in central dataset with First Name and Last Name of the Customer
+# In[138]:
+
+
+#Write Code Here
+cust_trans['First_name'] = cust_trans['CustName'].str.split(' ').apply(pd.Series).get(1)
+cust_trans['Last_name'] = cust_trans['CustName'].str.split(' ').apply(pd.Series).get(2)
+cust_trans
+
+
+# ##### How the marital status of a customer affects the amount spent?
+# * Find the total amount spent by different marital status categories
+
+# In[139]:
+
+
+#Write Code Here
+Spend_by_marital_status=cust_trans.groupby(['MaritalStatus'],as_index=False).agg({'billamt_afterdiscount': "sum"}).head(5)
+Spend_by_marital_status
+
+
+# ##### How the employment status of a customer affects the amount spent?
+# * Find amount spend by customers with different employment status
+# * Create a dataframe to store this information with two columns, Employment Status and Total Amount Spend
+
+# In[140]:
+
+
+#Write Code Here
+cust_trans.groupby(['occupation'],as_index=False).agg({'billamt_afterdiscount': "sum"})
+
+
+# In[141]:
+
+
+#Write Code Here
+Spend_by_emp_status=cust_trans.groupby(['occupation'],as_index=False).agg({'billamt_afterdiscount': "sum"})
+Spend_by_emp_status.rename(columns={ "billamt_afterdiscount" : 'TotAmtSpend',"occupation" : 'EmployeeStatus'},inplace=True)
+Spend_by_emp_status
+
+
+# ##### Create a dataframe for the transactions performed by the customers with age more than the average age of the customer. Also print the average age of customers
+
+# In[153]:
+
+
+#Write Code Here
+print(OnlineRetail_Cust.Age.mean())
+Cust_age_gt_mean = cust_trans[(cust_trans.Age > OnlineRetail_Cust.Age.mean())]
+Spend_cust_gt_avg_age=Cust_age_gt_mean.groupby(['CustomerID'],as_index=False).agg({'billamt_afterdiscount': "sum"})
+Spend_cust_gt_avg_age
+#tot_amt_spend_top5_percent
+
+
+# ##### Identify the top 5 selling products by the amount spend on their purchases
+
+# In[143]:
+
+
+#Write Code Here
+product_top5_spend=cust_trans.groupby(['Description'],as_index=False).agg({'billamt_afterdiscount': "sum"}).sort_values("billamt_afterdiscount", ascending=False).head(5)
+product_top5_spend
+
+
+# In[ ]:
+
+
+#Write Code Here
+
+
+# ##### Find the most common and least common first and last name of the customers
+
+# In[111]:
+
+
+#Write Code Here
+Cust_names=OnlineRetail_Cust
+Cust_names['First_name'] = cust_trans['CustName'].str.split(' ').apply(pd.Series).get(1)
+Cust_names['Last_name'] = cust_trans['CustName'].str.split(' ').apply(pd.Series).get(2)
+Firstname_mostcommon=Cust_names.groupby(['First_name'],as_index=False).agg({'CustomerID': "count"}).sort_values("CustomerID", ascending=False).head(5)
+Firstname_mostcommon.rename(columns={ "CustomerID" : 'Firstnamecnt'},inplace=True)
+Firstname_mostcommon.head()
+Firstname_lstcommon=Cust_names.groupby(['First_name'],as_index=False).agg({'CustomerID': "count"}).sort_values("CustomerID", ascending=True).head(5)
+Firstname_lstcommon.rename(columns={ "CustomerID" : 'Firstnamecnt'},inplace=True)
+Firstname_lstcommon.head()
+
+
+# In[114]:
+
+
+#Write Code Here
+Lastname_mostcommon=Cust_names.groupby(['Last_name'],as_index=False).agg({'CustomerID': "count"}).sort_values("CustomerID", ascending=False).head(5)
+Lastname_mostcommon.rename(columns={ "CustomerID" : 'First'},inplace=True)
+Lastname_mostcommon.head()
+lastname_lstcommon=Cust_names.groupby(['Last_name'],as_index=False).agg({'CustomerID': "count"}).sort_values("CustomerID", ascending=True).head(5)
+lastname_lstcommon.rename(columns={ "CustomerID" : 'First'},inplace=True)
+lastname_lstcommon.head()
+
+
+# ## Strategy Problem
+
+# **A retail store has a promotional budget from marketing department. It wants to increase loyalty and bring in new customers. A third party datasource has supplied them 10k customers which has all fields present as in their own internal dataset. But it can only give the offer to 1000 customers. It has supplied a few days of its internal transactional data to FICO together with applicant data. Using its own data it wants to create a strategy to target the right customers with the right offer(for example 5%,10%,15%,20%,30%)**
+# 
+# 
+# Design a strategy using statistical methods to identify 1k customers together with recommended offer from the 10k records.
+# 
+
+# In[3]:
+
+
+online_retail=pd.read_excel('AssignmentDatabase.xlsx',sheetname='InternalTransactionsDs')
+
+
+# In[4]:
+
+
+online_retail_dis=online_retail[online_retail['Discount_Pct']>0]
+
+
+# In[6]:
+
+
+online_retail_dis['billamt_nodiscount']=online_retail_dis.UnitPrice*online_retail_dis.Quantity
+online_retail_dis['billamt_afterdiscount']=online_retail_dis.UnitPrice*(1-online_retail_dis.Discount_Pct)*online_retail_dis.Quantity
+online_retail_dis['tot_savings']=online_retail_dis['billamt_nodiscount'] -  online_retail_dis['billamt_afterdiscount']
+
+
+# In[8]:
+
+
+online_retail_dis1=online_retail_dis.groupby(['CustomerID','Discount_Pct'],as_index=False)[['tot_savings']].sum()
+
+
+# In[15]:
+
+
+online_retail_dis2=online_retail_dis1.groupby(['CustomerID'],as_index=False)[['tot_savings']].max()
+
+
+# In[18]:
+
+
+online_retail_dis2['id'] = online_retail_dis2['CustomerID'].astype(str) + '_' + online_retail_dis2['tot_savings'].astype(str)
+
+
+# In[20]:
+
+
+online_retail_dis1['id'] = online_retail_dis1['CustomerID'].astype(str) + '_' + online_retail_dis1['tot_savings'].astype(str)
+
+
+# In[24]:
+
+
+merged_inner = pd.merge(left=online_retail_dis1,right=online_retail_dis2, left_on='id', right_on='id')
+merged_inner1=merged_inner.drop_duplicates(['CustomerID_x'])
+
+
+# In[32]:
+
+
+merged_inner2=merged_inner1[['CustomerID_x','Discount_Pct']]
+
+
+# In[34]:
+
+
+merged_inner2.rename(columns={'CustomerID_x': 'CustomerID'}, inplace=True)
+
+
+# In[38]:
+
+
+OnlineRetail_Cust=pd.read_excel('AssignmentDatabase.xlsx',sheetname='InternalcustomerDs')
+OnlineRetail_Cust1=OnlineRetail_Cust.drop(['CustName','Customer Since'],axis=1)
+
+
+# In[41]:
+
+
+cust_info_all=pd.merge(OnlineRetail_Cust1,merged_inner2,on="CustomerID",how ="left")
+
+
+# In[44]:
+
+
+cust_info_all.describe()
+
+
+# In[45]:
+
+
+cust_info_all.isnull().sum()
+
+
+# In[48]:
+
+
+le = preprocessing.LabelEncoder()
+
+
+# In[51]:
+
+
+one_hot = MultiLabelBinarizer()
+
+
+# In[74]:
+
+
+cust_info_all = cust_info_all.fillna(0)
+
+
+# In[75]:
+
+
+cust_info_all1=cust_info_all.drop(['CustomerID'],axis=1)
+
+
+# In[76]:
+
+
+cust_info_all1['DND'] = np.where(cust_info_all1['Do Not Disturb Customer']>='DND', 'no', 'yes')
+
+
+# In[77]:
+
+
+cust_info_all2=cust_info_all1.drop(['Do Not Disturb Customer'],axis=1)
+
+
+# In[81]:
+
+
+y=cust_info_all2['Discount_Pct']
+x=cust_info_all2.drop(['Discount_Pct'],axis=1)
+
+
+# In[94]:
+
+
+y_all=pd.get_dummies(y)
+np.array(y_all)
+
+
+# In[92]:
+
+
+encoder = LabelEncoder()
+encoder.fit(y)
+encoded_Y = encoder.transform(y)
+# convert integers to dummy variables (i.e. one hot encoded)
+dummy_y = np_utils.to_categorical(encoded_Y)
+
+
+# In[129]:
+
+
+x_gender=pd.get_dummies(cust_info_all2['Gender'])
+x_state=pd.get_dummies(cust_info_all2['State'])
+x_MaritalStatus=pd.get_dummies(cust_info_all2['MaritalStatus'])
+x_occupation=pd.get_dummies(cust_info_all2['occupation'])
+x_appResidence=pd.get_dummies(cust_info_all2['appResidence'])
+x_email=pd.get_dummies(cust_info_all2['email'])
+x_KYC_Status=pd.get_dummies(cust_info_all2['KYC Status'])
+x_DND=pd.get_dummies(cust_info_all2['DND'])
+cust_info_all3=cust_info_all2[['Age','RevenueScore','FamilySize','Kids']]
+x_all=pd.concat([x_gender,x_state,x_MaritalStatus,x_occupation,x_appResidence,x_email,x_KYC_Status,x_DND,cust_info_all3],axis=1)
+
+from sklearn.preprocessing import StandardScaler
+sc = StandardScaler()
+cust_info_all4 = sc.fit_transform(x_all)
+
+
+# In[131]:
+
+
+x_all.shape
+
+
+# In[167]:
+
+
+def baseline_model():
+    # create model
+    model = Sequential()
+    model.add(Dense(60, input_dim=36, activation='relu'))
+    model.add(Dense(5, activation='softmax'))
+    # Compile model
+    model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+    return model
+
+estimator = KerasClassifier(build_fn=baseline_model, epochs=50, batch_size=5, verbose=0)
+X_train, X_test, Y_train, Y_test = train_test_split(cust_info_all4, dummy_y, test_size=0.40, random_state=123456)
+estimator.fit(X_train, Y_train)
+estimator.fit(cust_info_all4, dummy_y)
+
+
+# In[168]:
+
+
+#Model Performance
+predictions = estimator.predict(cust_info_all4)
+print(accuracy_score(encoded_Y, predictions))
+print(confusion_matrix(encoded_Y, predictions))
+from sklearn.metrics import f1_score
+print(f1_score(encoded_Y, predictions, average='weighted'))
+
+
+# In[169]:
+
+
+online_retail_third=pd.read_excel('AssignmentDatabase.xlsx',sheetname='ThirdPartyDs')
+
+
+# In[173]:
+
+
+online_retail_third['DND'] = np.where(online_retail_third['Do Not Disturb Customer']>='DND', 'no', 'yes')
+
+
+# In[174]:
+
+
+x_gender_v1=pd.get_dummies(online_retail_third['Gender'])
+x_state_v1=pd.get_dummies(online_retail_third['State'])
+x_MaritalStatus_v1=pd.get_dummies(online_retail_third['MaritalStatus'])
+x_occupation_v1=pd.get_dummies(online_retail_third['occupation'])
+x_appResidence_v1=pd.get_dummies(online_retail_third['appResidence'])
+x_email_v1=pd.get_dummies(online_retail_third['email'])
+x_KYC_Status_v1=pd.get_dummies(online_retail_third['KYC Status'])
+x_DND_v1=pd.get_dummies(online_retail_third['DND'])
+cust_info_all3_v1=online_retail_third[['Age','RevenueScore','FamilySize','Kids']]
+x_all_v1=pd.concat([x_gender_v1,x_state_v1,x_MaritalStatus_v1,x_occupation_v1,x_appResidence_v1,x_email_v1,x_KYC_Status_v1,x_DND_v1,cust_info_all3_v1],axis=1)
+
+from sklearn.preprocessing import StandardScaler
+sc = StandardScaler()
+cust_info_all4_v1 = sc.fit_transform(x_all_v1)
+
+
+# In[175]:
+
+
+predictions_v1 = estimator.predict(cust_info_all4_v1)
+
+
+# In[178]:
+
+
+t=pd.DataFrame(predictions_v1)
+
+
+# In[188]:
+
+
+t.rename(columns={0: 'offer'}, inplace=True)
+
+
+# In[208]:
+
+
+rs_third=online_retail_third[['CustomerID','RevenueScore']]
+result_all=pd.concat([rs_third,t],axis=1)
+
+
+# In[211]:
+
+
+result_all1=result_all[result_all['offer']>0]
+final_list_cust1=result_all1.sort_values(by=['RevenueScore'],ascending=False)
+final_list_cust2=final_list_cust1.reset_index(drop=True)
+final_list_cust3=final_list_cust2.reset_index()
+
+
+# In[213]:
+
+
+final_list_cust4=final_list_cust3[final_list_cust3['index']<1001]
+
+
+# In[ ]:
+
+
+
+
