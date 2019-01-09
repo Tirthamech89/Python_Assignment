@@ -46,7 +46,7 @@ def readMessagesFromDir(dirPath, fileNamePattern, *args):
     return df
     
 #Collection of all the Dataset
-all=readMessagesFromDir('C:/Users/Tirthankar/Desktop/fractal/trial-run-recruitment-task/trial-run-recruitment-task/data','labelled','message','sentiment')
+all=readMessagesFromDir('C:/Users/Tirthankar/Desktop/trial-run-recruitment-task/trial-run-recruitment-task/data','labelled','message','sentiment')
 
 def makeLabel(fromFilePath):
     chk=fromFilePath
@@ -88,7 +88,7 @@ def countVocabulary(msgsDF):
     return rs2
     
 counts=countVocabulary(all1['message'])
-counts.to_csv('C:/Users/Tirthankar/Desktop/fractal/trial-run-recruitment-task/trial-run-recruitment-task/data/output_data_sol1.csv')
+counts.to_csv('C:/Users/Tirthankar/Desktop/trial-run-recruitment-task/trial-run-recruitment-task/data/output_data_sol1.csv')
 
 #....................................................................................................................................
 
@@ -135,7 +135,7 @@ def countVocabulary_v2(msgsDF):
     return ty12
     
 ty=countVocabulary_v2(all1['message'])
-ty.to_csv('C:/Users/Tirthankar/Desktop/fractal/trial-run-recruitment-task/trial-run-recruitment-task/data/output_data_sol2.csv')
+ty.to_csv('C:/Users/Tirthankar/Desktop/trial-run-recruitment-task/trial-run-recruitment-task/data/output_data_sol2.csv')
     
     
     
